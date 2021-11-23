@@ -1,0 +1,31 @@
+{
+  "name": "@kafka-money/v2-periphery",
+  "version": "1.1.0-beta.0",
+  "description": "kafka-money contracts",
+  "engines": {
+    "node": ">=10"
+  },
+  "homepage": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kafka-money/contracts"
+  },
+  "files": [
+    "build",
+    "contracts"
+  ],
+  "dependencies": {
+    "@openzeppelin/contracts": "3.4",
+    "@uniswap/lib": "4.0.1-alpha",
+    "@uniswap/v2-core": "1.0.0",
+    "ethers": "^5.5.1",
+    "hardhat": "^2.6.7",
+    "truffle-hdwallet-provider": "1.0.17"
+  },
+  "devDependencies": {
+  },
+  "scripts": {
+    "compile": "truffle compile"
+  },
+  "license": "GPL-3.0-or-later"
+}
