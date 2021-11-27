@@ -51,7 +51,8 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
     IERC20 public rewardsToken;
     IERC20 public stakingToken;
     uint256 public periodFinish = 0;
-    uint256 public rewardRate = 0;
+    uint256 public _rewardRate = 0; // rewardRate set by official
+    uint256 public rewardRateFromPenalty = 0; // rewards from other pool's early exit
     uint256 public rewardsDuration = 90 days;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
@@ -65,13 +66,16 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
     uint256 public immutable CREATED_TIME;
+    StakingRewardsLock public PenaltyPool;
 
     /* ========== CONSTRUCTOR ========== */
 
-    constructor(address _rewardsToken, address _stakingToken) public {
+    constructor(address _rewardsToken, address _stakingToken, StakingRewardsLock _PenaltyPool) public {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         CREATED_TIME = block.timestamp;
+        PenaltyPool = _PenaltyPool;
+        require(address(_PenaltyPool)==address(0) || _PenaltyPool.rewardsToken() == rewardsToken, "invalid _PenaltyPool");
     }
 
     function earlyPenalty(uint256 amount)
@@ -81,6 +85,10 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
     {
         eraly = amount / 3;
         penalty = amount - eraly;
+    }
+
+    function rewardRate() public view returns(uint256) {
+        return _rewardRate + rewardRateFromPenalty;
     }
 
     function curEpochStart() public view returns (uint256) {
@@ -113,7 +121,7 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
             rewardPerTokenStored.add(
                 lastTimeRewardApplicable()
                     .sub(lastUpdateTime)
-                    .mul(rewardRate)
+                    .mul(rewardRate())
                     .mul(1e18)
                     .div(_totalSupply)
             );
@@ -131,7 +139,7 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
     }
 
     function getRewardForDuration() external view returns (uint256) {
-        return rewardRate.mul(rewardsDuration);
+        return rewardRate().mul(rewardsDuration);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -215,7 +223,13 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
             uint256 burned = penalty / 6;
             uint256 notified = penalty - burned;
             rewardsToken.safeTransfer(address(0), burned);
-            emit EarlyPenalty(msg.sender, early, burned, address(0), notified);
+            StakingRewardsLock pool = address(PenaltyPool) == address(0) ? this : PenaltyPool;
+            {
+                if(pool != this)
+                    rewardsToken.approve(address(pool), notified);
+                pool.notifyExtraReward(notified);
+            }
+            emit EarlyPenalty(msg.sender, early, burned, address(pool), notified);
         }
     }
 
@@ -230,8 +244,22 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
         onlyOwner
         updateReward(address(0))
     {
-        emit SetRewardRate(rewardRate, rewardPerSecond);
-        rewardRate = rewardPerSecond;
+        _rewardRate = rewardPerSecond;
+        emit SetRewardRate(rewardPerSecond);
+    }
+
+    function notifyExtraReward(uint256 amount)
+        external
+        updateReward(address(0))
+    {
+        if(msg.sender != address(this))
+            rewardsToken.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 curEpochEnd = curEpochStart().add(rewardsDuration);
+        if(block.timestamp < curEpochEnd) {
+            uint256 duration = curEpochEnd.sub(block.timestamp);
+            rewardRateFromPenalty = rewardRateFromPenalty.add(amount.div(duration));
+            emit NotifyExtraReward(msg.sender, amount, rewardRateFromPenalty);
+        }
     }
 
     function setPeriodFinish(uint256 _periodFinish) external onlyOwner {
@@ -297,7 +325,8 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
         address toStakePool,
         uint256 toAmount
     );
-    event SetRewardRate(uint256 oldRate, uint256 newRate);
+    event SetRewardRate(uint256 rate);
+    event NotifyExtraReward(address from, uint256 amount, uint256 rate);
 }
 
 interface IUniswapV2ERC20 {
