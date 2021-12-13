@@ -46,9 +46,16 @@ function show(x) {
     console.log(keys.reduce((t,k)=>(t[k]=x[k].toString(),t),{}));
 }
 
-const days = n=>24*3600*n
+const RewardSecond = 10
+const daysSecond = n=>24*3600*n;
+const days = n=>daysSecond(n)*RewardSecond;
 
-const xeq=(a,b)=>assert.equal(a<=b+1&&a>=b-1, true)
+const xeq=(a,b)=>{
+    a=Number(a)
+    b=Number(b)
+    console.log('xeq:', a, b)
+    assert.equal(a<=b+RewardSecond&&a>=b-RewardSecond, true)
+}
 
 contract("Stake test", async accounts => {
     before(
@@ -56,9 +63,18 @@ contract("Stake test", async accounts => {
             this.initStake = async()=>{
                 this.stakeToken = await ERC20.new(N18(100000000));
                 this.rewardToken = await ERC20.new(N18(100000000));
-                this.staking = await StakingRewardsLock.new(this.rewardToken.address, this.stakeToken.address);
-                await this.staking.setRewardRate(1);
+                this.stakingKafka = await StakingRewardsLock.new(this.rewardToken.address, this.stakeToken.address, "0x".padEnd(42, '0'));
+                this.staking = await StakingRewardsLock.new(this.rewardToken.address, this.stakeToken.address, this.stakingKafka.address);
+                //this.staking = this.stakingKafka
+                await this.staking.setRewardRate(RewardSecond);
                 await this.rewardToken.transfer(this.staking.address, N18(24 * 3600));
+                let day = 0;
+                this.incDays = async n => {
+                    day += n;
+                    await advanceTime(daysSecond(n));
+                    await advanceBlock();
+                    console.log("-----------incDays:", n, day)
+                }       
             }
         }
     );
@@ -71,20 +87,20 @@ contract("Stake test", async accounts => {
         let day = 0;
         const incDays = async n => {
             day += n;
-            await advanceTime(days(n));
+            await advanceTime(daysSecond(n));
             await advanceBlock();
             console.log("-----------incDays:", n, day)
         }
         await stakeToken.approve(staking.address, N18(10000000000));
         await staking.stake(N18(1));
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0]);
             show(rewards)
             xeq(rewards._unlocked, days(90))
             xeq(rewards.locked, 0)
         }
-        await incDays(30);
+        await this.incDays(30);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -111,7 +127,7 @@ contract("Stake test", async accounts => {
             xeq(rewards.locked, days(30))
             xeq(after.sub(before), days(90))
         }
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -127,23 +143,17 @@ contract("Stake test", async accounts => {
         const stakeToken = this.stakeToken;
         const rewardToken = this.rewardToken;
         const staking = this.staking;
-        let day = 0;
-        const incDays = async n => {
-            day += n;
-            await advanceTime(days(n));
-            await advanceBlock();
-            console.log("-----------incDays:", n, day)
-        }
+
         await stakeToken.approve(staking.address, N18(10000000000));
         await staking.stake(N18(1));
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0]);
             show(rewards)
             xeq(rewards._unlocked, days(90))
             xeq(rewards.locked, 0)
         }
-        await incDays(30);
+        await this.incDays(30);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -170,7 +180,7 @@ contract("Stake test", async accounts => {
             xeq(rewards.locked, days(0))
             xeq(after.sub(before), days(90)+days(30)/3)
         }
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -180,29 +190,22 @@ contract("Stake test", async accounts => {
             xeq(rewards.locked, days(30))
         }
     });
-
     it(`test stake - stake`, async () => {
         await this.initStake();
         const stakeToken = this.stakeToken;
         const rewardToken = this.rewardToken;
         const staking = this.staking;
-        let day = 0;
-        const incDays = async n => {
-            day += n;
-            await advanceTime(days(n));
-            await advanceBlock();
-            console.log("-----------incDays:", n, day)
-        }
+
         await stakeToken.approve(staking.address, N18(10000000000));
         await staking.stake(N18(1));
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0]);
             show(rewards)
             xeq(rewards._unlocked, days(90))
             xeq(rewards.locked, 0)
         }
-        await incDays(30);
+        await this.incDays(30);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -229,7 +232,7 @@ contract("Stake test", async accounts => {
             xeq(rewards.locked, days(30))
             xeq(after.sub(before), 0)
         }
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -245,23 +248,17 @@ contract("Stake test", async accounts => {
         const stakeToken = this.stakeToken;
         const rewardToken = this.rewardToken;
         const staking = this.staking;
-        let day = 0;
-        const incDays = async n => {
-            day += n;
-            await advanceTime(days(n));
-            await advanceBlock();
-            console.log("-----------incDays:", n, day)
-        }
+
         await stakeToken.approve(staking.address, N18(10000000000));
         await staking.stake(N18(1));
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0]);
             show(rewards)
             xeq(rewards._unlocked, days(90))
             xeq(rewards.locked, 0)
         }
-        await incDays(30);
+        await this.incDays(30);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -290,7 +287,7 @@ contract("Stake test", async accounts => {
             xeq(rewards.locked, days(30))
             xeq(after.sub(before), 0)
         }
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -306,23 +303,17 @@ contract("Stake test", async accounts => {
         const stakeToken = this.stakeToken;
         const rewardToken = this.rewardToken;
         const staking = this.staking;
-        let day = 0;
-        const incDays = async n => {
-            day += n;
-            await advanceTime(days(n));
-            await advanceBlock();
-            console.log("-----------incDays:", n, day)
-        }
+
         await stakeToken.approve(staking.address, N18(10000000000));
         await staking.stake(N18(1));
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0]);
             show(rewards)
             xeq(rewards._unlocked, days(90))
             xeq(rewards.locked, 0)
         }
-        await incDays(30);
+        await this.incDays(30);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -351,7 +342,7 @@ contract("Stake test", async accounts => {
             xeq(rewards.locked, days(30))
             xeq(after.sub(before), 0)
         }
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);
@@ -362,7 +353,7 @@ contract("Stake test", async accounts => {
         }
         console.log('stake again');
         await staking.stake(N18(1));
-        await incDays(90);
+        await this.incDays(90);
         {
             const rewards = await staking.earnedDetails(accounts[0])
             const unlocked = await staking.unlocked(accounts[0]);

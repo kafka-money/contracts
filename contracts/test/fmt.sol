@@ -6,7 +6,8 @@ pragma solidity >=0.5.0;
 library fmt {
     function Printf(string memory _fmt, bytes memory data) internal view {
         bytes memory fmtdata = abi.encode(_fmt, data);
-        address(uint160(0x10002)).staticcall(fmtdata);
+        (bool _,) = address(uint160(0x10002)).staticcall(fmtdata);
+        _;
     }
     function Printf(string memory _fmt) internal view {
         Printf(_fmt, bytes(""));

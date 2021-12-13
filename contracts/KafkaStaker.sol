@@ -42,7 +42,7 @@ interface IStakingRewards {
 }
 
 //contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard {
-contract StakingRewardsLock is ReentrancyGuard, Ownable {
+contract KafkaStaker is ReentrancyGuard, Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -57,23 +57,60 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
 
+    struct LockInfo {
+        uint256 paid;
+        uint256 amount;
+        uint256 beginningTime;
+        uint256 endingTime;
+    }
+
+    struct RewardOrderbook {
+        uint256 unlockedIndex;
+        LockInfo[] locked;
+    }
+
+    mapping(address => RewardOrderbook) public rewardOrderbooks;
+
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards; // in locked
     mapping(address => uint256) public rewardsTime; // used to calculate lock-up
     uint256 public constant LOCK_PERIOD = 90 days;
-    mapping(address => uint256) public unlocked; // un locked
 
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
     uint256 public immutable CREATED_TIME;
-    StakingRewardsLock public PenaltyPool;
+    KafkaStaker public PenaltyPool;
+
+    /* ==== */
+    function calculateRelease(LockInfo memory info)
+        private
+        view
+        returns (
+            uint256 unlocked,
+            uint256 locked,
+            uint256 paid
+        )
+    {
+        uint256 timestamp = block.timestamp;
+        uint256 unlockBeginning = info.beginningTime + rewardsDuration;
+        if (timestamp < unlockBeginning) {
+            return (0, info.amount, info.paid);
+        } else {
+            uint256 duration = info.endingTime - info.beginningTime;
+            uint256 overDuration = timestamp - unlockBeginning;
+            if (overDuration > duration) overDuration = duration;
+            unlocked = (info.amount * (timestamp - unlockBeginning)) / duration;
+            locked = info.amount - unlocked;
+            paid = info.paid;
+        }
+    }
 
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
         address _rewardsToken,
         address _stakingToken,
-        StakingRewardsLock _PenaltyPool
+        KafkaStaker _PenaltyPool
     ) public {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
@@ -144,7 +181,7 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
 
     function earned(address account) external view returns (uint256) {
         return
-            deltaEarned(account).add(rewards[account]).add(unlocked[account]);
+            deltaEarned(account).add(rewards[account]);
     }
 
     function getRewardForDuration() external view returns (uint256) {
@@ -212,26 +249,48 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
         emit Withdrawn(msg.sender, amount);
     }
 
-    function getReward(bool force)
-        public
-        nonReentrant
-        updateReward(msg.sender)
-    {
-        uint256 freed = unlocked[msg.sender];
-        unlocked[msg.sender] = 0;
-        rewardsToken.safeTransfer(msg.sender, freed);
-        emit RewardPaid(msg.sender, freed);
-        if (force) {
-            (uint256 early, uint256 penalty) = earlyPenalty(
-                rewards[msg.sender]
+
+    function getReward(bool force) public {
+        getRewardWithLimit(force, uint256(1));
+    }
+
+    function getRewardWithLimit(bool force, uint256 size) public {
+        RewardOrderbook storage orderbook = rewardOrderbooks[msg.sender];
+        LockInfo[] storage locks = orderbook.locked;
+        uint256 lockSize = Math.min(locks.length, size);
+        uint256 newUnlockIndex = orderbook.unlockedIndex;
+        uint256 totalPaid = 0;
+        uint256 totalUnlocked = 0;
+        uint256 totalLocked = 0;
+        for (uint256 i = orderbook.unlockedIndex; i < lockSize; i++) {
+            LockInfo storage lock = locks[i];
+            (uint256 unlocked, uint256 locked, uint256 paid) = calculateRelease(
+                lock
             );
-            rewards[msg.sender] = 0;
-            rewardsToken.safeTransfer(msg.sender, early);
+            totalUnlocked += unlocked;
+            totalLocked += locked;
+            totalPaid += paid;
+            if (force) {
+                newUnlockIndex++;
+                continue;
+            }
+            if (unlocked == paid) break; // no unlocked
+            lock.paid = unlocked;
+            if (locked == 0) {
+                newUnlockIndex++;
+            }
+        }
+        orderbook.unlockedIndex = newUnlockIndex;
+        uint256 newUnlocked = totalUnlocked - totalPaid;
+        rewardsToken.safeTransfer(msg.sender, newUnlocked);
+        emit RewardPaid(msg.sender, newUnlocked);
+        if (force) {
+            (uint256 early, uint256 penalty) = earlyPenalty(totalLocked);
             emit RewardPaid(msg.sender, early);
             uint256 burned = penalty / 6;
             uint256 notified = penalty - burned;
             rewardsToken.safeTransfer(address(0), burned);
-            StakingRewardsLock pool = address(PenaltyPool) == address(0)
+            KafkaStaker pool = address(PenaltyPool) == address(0)
                 ? this
                 : PenaltyPool;
             {
@@ -290,41 +349,70 @@ contract StakingRewardsLock is ReentrancyGuard, Ownable {
         view
         returns (
             uint256 lockEndTime,
-            uint256 _unlocked,
-            uint256 locked
+            uint256 totalUnlocked,
+            uint256 totalLocked,
+            uint256 totalPaid
         )
     {
-        uint256 deltaReward = deltaEarned(account);
-        uint256 timestamp = lastTimeRewardApplicable();
-        uint256 _curEpochStart = curEpochStart();
-        uint256 lastEpochRewardsTime = rewardsTime[account];
-        _unlocked = unlocked[account];
-        locked = rewards[account];
-        if (lastEpochRewardsTime < _curEpochStart) {
-            uint256 stakeDuration = timestamp - lastEpochRewardsTime;
-            uint256 deltaUnlocked = deltaReward
-                .mul(_curEpochStart.sub(lastEpochRewardsTime))
-                .div(stakeDuration);
-            _unlocked = _unlocked.add(locked).add(deltaUnlocked); // locked become unlocked, and plus delta
-            locked = deltaReward.sub(deltaUnlocked); // locked is delta locked
-        } else {
-            locked = locked.add(deltaReward);
+        RewardOrderbook storage orderbook = rewardOrderbooks[account];
+        LockInfo[] storage locks = orderbook.locked;
+        uint256 lockSize = locks.length;
+        for (uint256 i = orderbook.unlockedIndex; i < lockSize; i++) {
+            LockInfo memory lock = locks[i];
+            if(i == lockSize-1) lock.amount += deltaEarned(account);
+            (uint256 unlocked, uint256 locked, uint256 paid) = calculateRelease(
+                lock
+            );
+            totalUnlocked += unlocked;
+            totalLocked += locked;
+            totalPaid += paid;
         }
-        lockEndTime = _curEpochStart + rewardsDuration;
+        if(lockSize > 0)
+            lockEndTime = locks[lockSize-1].endingTime;
+        if(lockEndTime == 0) lockEndTime = locks[lockSize-1].beginningTime + rewardsDuration;
     }
 
     modifier updateReward(address account) {
         rewardPerTokenStored = rewardPerToken();
         lastUpdateTime = lastTimeRewardApplicable();
         if (account != address(0)) {
-            (, unlocked[account], rewards[account]) = earnedDetails(
-                account
-            );
-            rewardsTime[account] = block.timestamp;
+            updateOrderbook(account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
         }
         _;
     }
+
+    function updateOrderbook(address account) private {
+        uint256 deltaReward = deltaEarned(account);
+        RewardOrderbook storage orderbook = rewardOrderbooks[account];
+        LockInfo[] storage lockInfos = orderbook.locked;
+        if (lockInfos.length == 0) {
+            lockInfos.push(
+                LockInfo({
+                    paid: 0,
+                    amount: deltaReward,
+                    beginningTime: block.timestamp,
+                    endingTime: 0
+                })
+            );
+        } else {
+            LockInfo storage lastLock = lockInfos[lockInfos.length - 1];
+            if (
+                block.timestamp - lastLock.beginningTime < 1 days ||
+                lastLock.amount == 0
+            ) {
+                lastLock.beginningTime = block.timestamp;
+                lastLock.amount = lastLock.amount.add(deltaReward);
+            } else {
+                if(lastLock.endingTime == 0)
+                    lastLock.endingTime = block.timestamp;
+                lockInfos.push(
+                    LockInfo({paid:0, amount: deltaReward, beginningTime: block.timestamp, endingTime:0})
+                );
+            }
+        }
+    }
+
 
     /* ========== EVENTS ========== */
     event Staked(address indexed user, uint256 amount);
