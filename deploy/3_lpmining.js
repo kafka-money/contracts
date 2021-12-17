@@ -1,4 +1,4 @@
-const StakingRewards = artifacts.require("StakingRewards");
+const StakingRewardsLock = artifacts.require("StakingRewardsLock");
 const IERC20 = artifacts.require("ERC20");
 const PairFor = artifacts.require("PairFor");
 const fs = require('fs');
@@ -37,27 +37,30 @@ async function main() {
     const {tokens} = require(`../cocoSwap_${chainID}.json`);
     const uni = await IERC20.at(UNI);
     const stakes = []
+    const uniPool = deployed.STAKING[0];
 
+
+    const rewardPerSecond = web3.utils.toWei('0.1');
+    const reward60days = web3.utils.toWei("600000");
     for(const i in tokens) {
         const token0 = tokens[i];
         for(let j = Number(i)+1; j < tokens.length; j++) {
             const token1 = tokens[j];
-            const reward60days = web3.utils.toWei("600000");
             const pair = pairAddress(token0.address, token1.address);
             //const pairLog = await pairC.pairForX(deployed.FACTORY_ADDRESS, token0.address, token1.address)
             //console.log('log:', pairLog)
             //const pair2 = await pairC.pairFor(deployed.FACTORY_ADDRESS, token0.address, token1.address)
             //console.log(i, deployed.FACTORY_ADDRESS, token0, token1, pair)
             console.log(i, token0.symbol, token1.symbol, pair, await exist(pair));
-            const stake = await StakingRewards.new(accounts[0], UNI, pair);
+            const stake = await StakingRewardsLock.new(UNI, pair, uniPool.stakingAddress);
             stakes.push({
                 tokens: [token0.symbol, token1.symbol],
                 stakingRewardAddress: stake.address
             });
             console.log("transfer...")
             await uni.transfer(stake.address, reward60days);
-            console.log("notifyRewardAmount...")
-            await stake.notifyRewardAmount(reward60days);
+            console.log("setRewardRate...")
+            await stake.setRewardRate(rewardPerSecond);
         }
     }
     console.log(stakes)

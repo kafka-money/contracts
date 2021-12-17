@@ -1,8 +1,9 @@
-const StakingRewards = artifacts.require("StakingRewards");
+const StakingRewardsLock = artifacts.require("StakingRewardsLock");
 const ERC20 = artifacts.require("ERC20");
 const fs = require('fs');
 
 const max256 = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+const zeroAddress = '0x'.padEnd(42, '0')
 
 async function main() {
     //const pairC = await PairFor.new();
@@ -16,9 +17,10 @@ async function main() {
     const uni = await ERC20.at(UNI);
     const stakes = []
 
-    const rewardPerSecond = web3.utils.toWei('1');
+    const rewardPerSecond = web3.utils.toWei('0.1');
     const reward60days = web3.utils.toWei("600000");
-    const stake = await StakingRewards.new(UNI, UNI);
+    console.log("uni:", UNI)
+    const stake = await StakingRewardsLock.new(UNI, UNI, zeroAddress);
     await stake.setRewardRate(rewardPerSecond);
     await uni.transfer(stake.address, reward60days);
     stakes.push({
@@ -27,8 +29,9 @@ async function main() {
         stakeToken: UNI,
         rewardToken: UNI
     })
+    const uniPool = stake.address;
     for(const token of tokens) {
-        const stake = await StakingRewards.new(UNI, token.address);
+        const stake = await StakingRewardsLock.new(UNI, token.address, uniPool);
         await stake.setRewardRate(rewardPerSecond);
         stakes.push({
             names:[token.symbol, "uni"],
@@ -53,11 +56,11 @@ async function stake() {
     const UNI = deployed.UNI;
     const {tokens} = require(`../cocoSwap_${chainID}.json`);
     //const uni = await ERC20.at(UNI);
-    //const stakingRewards = await StakingRewards.at(deployed.STAKING[0].stakingAddress);
+    //const stakingRewards = await StakingRewardsLock.at(deployed.STAKING[0].stakingAddress);
     //await uni.approve(stakingRewards.address, max256);
     //await stakingRewards.stake(web3.utils.toWei('10'));
     for(const staking of deployed.STAKING) {
-        const stakingRewards = await StakingRewards.at(staking.stakingAddress);
+        const stakingRewards = await StakingRewardsLock.at(staking.stakingAddress);
         const stakingToken = await ERC20.at(staking.stakeToken);
         const decimals = Number(await stakingToken.decimals());
         const amount = n=>`${n}${'0'.repeat(decimals)}`
