@@ -13,8 +13,8 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import './MasterChef.sol';
 
-import {IStakingRewards} from "./interfaces/IStakingRewards.sol";
-import {IUniswapV2ERC20} from "./interfaces/IUniswapV2ERC20.sol";
+import {IStakingRewards} from "../interfaces/IStakingRewards.sol";
+import {IUniswapV2ERC20} from "../interfaces/IUniswapV2ERC20.sol";
 
 contract RewardsDistributionRecipient {
     address public rewardsDistribution;

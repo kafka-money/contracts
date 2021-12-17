@@ -14,8 +14,9 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {IStakingRewards} from "./interfaces/IStakingRewards.sol";
 import {IUniswapV2ERC20} from "./interfaces/IUniswapV2ERC20.sol";
+import {MultiFeeDistribution} from "./KafkaStaker.sol";
 
-contract StakingRewards is IStakingRewards, ReentrancyGuard,Ownable {
+contract StakingRewardsKafka is IStakingRewards, ReentrancyGuard,Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -34,15 +35,18 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard,Ownable {
 
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
+    MultiFeeDistribution kafkaStaker;
 
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
         address _rewardsToken,
-        address _stakingToken
+        address _stakingToken,
+        address _kafkaStaker
     ) public {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
+        kafkaStaker = MultiFeeDistribution(_kafkaStaker);
     }
 
     /* ========== VIEWS ========== */
@@ -138,7 +142,10 @@ contract StakingRewards is IStakingRewards, ReentrancyGuard,Ownable {
         rewardPerTokenStored = rewardPerToken();
         lastUpdateTime = lastTimeRewardApplicable();
         if (account != address(0)) {
-            rewards[account] = earned(account);
+            uint256 deltaEarned = earned(account);
+            stakingToken.approve(address(kafkaStaker), deltaEarned);
+            kafkaStaker.mint(account, deltaEarned);
+            //rewards[account] = earned(account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
         }
         _;
