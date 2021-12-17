@@ -1,3 +1,4 @@
+pragma solidity =0.6.6;
 import "../libraries/UniswapV2Library.sol";
 contract PairFor {
         // calculates the CREATE2 address for a pair without making any external calls
@@ -18,7 +19,7 @@ contract PairFor {
             );
         bytes32 dataHash = keccak256(finalBytes);
         
-            // new 0d095814c5930254f0c1d4590fcbb8fc3e6ed8e07d26831a95450ee1fe18afe1
+            // new 0xd91ce99df031584f1cac7d4375e0a1a6f68d7f933304409548f2948911fdcb91
             // old 3219438fd390818ae77173fa95298240dab79e38c7842f1e6512503b9c82e52f
         return (tokenPacked, tokenHash, finalBytes, dataHash, address(uint(dataHash)));
     }

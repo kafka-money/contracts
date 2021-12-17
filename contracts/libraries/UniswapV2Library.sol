@@ -1,4 +1,4 @@
-pragma solidity >=0.5.0;
+pragma solidity =0.6.6;
 
 import '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 
@@ -21,7 +21,7 @@ library UniswapV2Library {
                 hex'ff',
                 factory,
                 keccak256(abi.encodePacked(token0, token1)),
-                hex'0d095814c5930254f0c1d4590fcbb8fc3e6ed8e07d26831a95450ee1fe18afe1' // init code hash
+                hex'd91ce99df031584f1cac7d4375e0a1a6f68d7f933304409548f2948911fdcb91' // init code hash
             ))));
     }
 

@@ -11,35 +11,11 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-// Inheritancea
-// Inheritancea
-interface IStakingRewards {
-    // Views
-    function lastTimeRewardApplicable() external view returns (uint256);
 
-    function rewardPerToken() external view returns (uint256);
+import {IStakingRewards} from "./interfaces/IStakingRewards.sol";
+import {IUniswapV2ERC20} from "./interfaces/IUniswapV2ERC20.sol";
 
-    function earned(address account) external view returns (uint256);
-
-    function getRewardForDuration() external view returns (uint256);
-
-    function totalSupply() external view returns (uint256);
-
-    function balanceOf(address account) external view returns (uint256);
-
-    // Mutative
-
-    function stake(uint256 amount) external;
-
-    function withdraw(uint256 amount) external;
-
-    function getReward() external;
-
-    function exit() external;
-}
-
-//contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard {
-contract StakingRewards is ReentrancyGuard, Ownable {
+contract StakingRewards is IStakingRewards, ReentrancyGuard,Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -71,20 +47,20 @@ contract StakingRewards is ReentrancyGuard, Ownable {
 
     /* ========== VIEWS ========== */
 
-    function totalSupply() external view returns (uint256) {
+    function totalSupply() external override view returns (uint256) {
         return _totalSupply;
     }
 
-    function balanceOf(address account) external view returns (uint256) {
+    function balanceOf(address account) external override view returns (uint256) {
         return _balances[account];
     }
 
-    function lastTimeRewardApplicable() public view returns (uint256) {
+    function lastTimeRewardApplicable() public override view returns (uint256) {
         if(periodFinish == 0) return block.timestamp;
         return Math.min(block.timestamp, periodFinish);
     }
 
-    function rewardPerToken() public view returns (uint256) {
+    function rewardPerToken() public override view returns (uint256) {
         if (_totalSupply == 0) {
             return rewardPerTokenStored;
         }
@@ -94,11 +70,11 @@ contract StakingRewards is ReentrancyGuard, Ownable {
             );
     }
 
-    function earned(address account) public view returns (uint256) {
+    function earned(address account) public override view returns (uint256) {
         return _balances[account].mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(rewards[account]);
     }
 
-    function getRewardForDuration() external view returns (uint256) {
+    function getRewardForDuration() external override view returns (uint256) {
         return rewardRate.mul(rewardsDuration);
     }
 
@@ -116,7 +92,7 @@ contract StakingRewards is ReentrancyGuard, Ownable {
         emit Staked(msg.sender, amount);
     }
 
-    function stake(uint256 amount) external nonReentrant updateReward(msg.sender) {
+    function stake(uint256 amount) external override nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(amount);
         _balances[msg.sender] = _balances[msg.sender].add(amount);
@@ -124,7 +100,7 @@ contract StakingRewards is ReentrancyGuard, Ownable {
         emit Staked(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) public nonReentrant updateReward(msg.sender) {
+    function withdraw(uint256 amount) public override nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
@@ -132,7 +108,7 @@ contract StakingRewards is ReentrancyGuard, Ownable {
         emit Withdrawn(msg.sender, amount);
     }
 
-    function getReward() public nonReentrant updateReward(msg.sender) {
+    function getReward() public override nonReentrant updateReward(msg.sender) {
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
@@ -141,7 +117,7 @@ contract StakingRewards is ReentrancyGuard, Ownable {
         }
     }
 
-    function exit() external {
+    function exit() external override {
         withdraw(_balances[msg.sender]);
         getReward();
     }
@@ -173,8 +149,4 @@ contract StakingRewards is ReentrancyGuard, Ownable {
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
     event SetRewardRate(uint256 oldRate, uint256 newRate);
-}
-
-interface IUniswapV2ERC20 {
-    function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external;
 }

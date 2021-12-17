@@ -1,7 +1,3 @@
-/**
- *Submitted for verification at Etherscan.io on 2020-09-16
- */
-
 pragma solidity =0.6.6;
 pragma experimental ABIEncoderV2;
 
@@ -13,34 +9,10 @@ import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+import {IUniswapV2ERC20} from "./interfaces/IUniswapV2ERC20.sol";
+import {IStakingRewards} from "./interfaces/IStakingRewards.sol";
+
 import "./test/fmt.sol";
-
-// Inheritancea
-// Inheritancea
-interface IStakingRewards {
-    // Views
-    function lastTimeRewardApplicable() external view returns (uint256);
-
-    function rewardPerToken() external view returns (uint256);
-
-    function earned(address account) external view returns (uint256);
-
-    function getRewardForDuration() external view returns (uint256);
-
-    function totalSupply() external view returns (uint256);
-
-    function balanceOf(address account) external view returns (uint256);
-
-    // Mutative
-
-    function stake(uint256 amount) external;
-
-    function withdraw(uint256 amount) external;
-
-    function getReward() external;
-
-    function exit() external;
-}
 
 //contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard {
 contract LPStaker is ReentrancyGuard, Ownable {
@@ -73,11 +45,10 @@ contract LPStaker is ReentrancyGuard, Ownable {
     mapping(address => RewardOrderbook) public rewardOrderbooks;
 
     mapping(address => uint256) public userRewardPerTokenPaid;
-    mapping(address => uint256) public rewardsTime; // used to calculate lock-up
     uint256 public constant LOCK_PERIOD = 90 days;
 
     uint256 private _totalSupply;
-    mapping(address => uint256) private _balances;
+    mapping(address => uint256) private balances;
     uint256 public immutable CREATED_TIME;
     LPStaker public PenaltyPool;
 
@@ -160,7 +131,7 @@ contract LPStaker is ReentrancyGuard, Ownable {
     }
 
     function balanceOf(address account) external view returns (uint256) {
-        return _balances[account];
+        return balances[account];
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {
@@ -184,7 +155,7 @@ contract LPStaker is ReentrancyGuard, Ownable {
 
     function deltaEarned(address account) public view returns (uint256) {
         return
-            _balances[account]
+            balances[account]
                 .mul(rewardPerToken().sub(userRewardPerTokenPaid[account]))
                 .div(1e18);
     }
@@ -211,7 +182,7 @@ contract LPStaker is ReentrancyGuard, Ownable {
     ) external nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(amount);
-        _balances[msg.sender] = _balances[msg.sender].add(amount);
+        balances[msg.sender] = balances[msg.sender].add(amount);
 
         // permit
         IUniswapV2ERC20(address(stakingToken)).permit(
@@ -235,7 +206,7 @@ contract LPStaker is ReentrancyGuard, Ownable {
     {
         require(amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(amount);
-        _balances[msg.sender] = _balances[msg.sender].add(amount);
+        balances[msg.sender] = balances[msg.sender].add(amount);
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Staked(msg.sender, amount);
     }
@@ -256,7 +227,7 @@ contract LPStaker is ReentrancyGuard, Ownable {
     function _withdraw(uint256 amount) private {
         require(amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(amount);
-        _balances[msg.sender] = _balances[msg.sender].sub(amount);
+        balances[msg.sender] = balances[msg.sender].sub(amount);
         stakingToken.safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
@@ -325,7 +296,7 @@ contract LPStaker is ReentrancyGuard, Ownable {
     }
 
     function exit() external {
-        withdraw(_balances[msg.sender]);
+        withdraw(balances[msg.sender]);
         getReward(true);
     }
 
@@ -449,16 +420,4 @@ contract LPStaker is ReentrancyGuard, Ownable {
     );
     event SetRewardRate(uint256 rate);
     event NotifyExtraReward(address from, uint256 amount, uint256 rate);
-}
-
-interface IUniswapV2ERC20 {
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external;
 }
