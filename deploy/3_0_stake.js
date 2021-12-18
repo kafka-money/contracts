@@ -1,4 +1,4 @@
-const StakingRewardsLock = artifacts.require("StakingRewardsLock");
+const KafkaStaker = artifacts.require("KafkaStaker");
 const ERC20 = artifacts.require("ERC20");
 const fs = require('fs');
 
@@ -18,28 +18,18 @@ async function main() {
     const stakes = []
 
     const rewardPerSecond = web3.utils.toWei('0.1');
-    const reward60days = web3.utils.toWei("600000");
+    const reward90days = web3.utils.toWei("900000");
     console.log("uni:", UNI)
-    const stake = await StakingRewardsLock.new(UNI, UNI, zeroAddress);
-    await stake.setRewardRate(rewardPerSecond);
-    await uni.transfer(stake.address, reward60days);
+    const staker = await KafkaStaker.new(UNI);
+    await staker.approveRewardDistributor(UNI, accounts[0], true);
+    await uni.approve(staker.address, reward90days);
+    await staker.notifyRewardAmount(UNI, reward90days);
     stakes.push({
         names:["uni","uni"],
-        stakingAddress: stake.address,
+        stakingAddress: staker.address,
         stakeToken: UNI,
         rewardToken: UNI
-    })
-    const uniPool = stake.address;
-    for(const token of tokens) {
-        const stake = await StakingRewardsLock.new(UNI, token.address, uniPool);
-        await stake.setRewardRate(rewardPerSecond);
-        stakes.push({
-            names:[token.symbol, "uni"],
-            stakingAddress: stake.address,
-            stakeToken: token.address,
-            rewardToken: UNI
-        });
-    }
+    });
     console.log(stakes)
     deployed.STAKING = stakes;
     fs.writeFileSync(`./factory_${chainID}.json`, JSON.stringify(deployed));
@@ -56,11 +46,11 @@ async function stake() {
     const UNI = deployed.UNI;
     const {tokens} = require(`../cocoSwap_${chainID}.json`);
     //const uni = await ERC20.at(UNI);
-    //const stakingRewards = await StakingRewardsLock.at(deployed.STAKING[0].stakingAddress);
+    //const stakingRewards = await KafkaStaker.at(deployed.STAKING[0].stakingAddress);
     //await uni.approve(stakingRewards.address, max256);
     //await stakingRewards.stake(web3.utils.toWei('10'));
     for(const staking of deployed.STAKING) {
-        const stakingRewards = await StakingRewardsLock.at(staking.stakingAddress);
+        const stakingRewards = await KafkaStaker.at(staking.stakingAddress);
         const stakingToken = await ERC20.at(staking.stakeToken);
         const decimals = Number(await stakingToken.decimals());
         const amount = n=>`${n}${'0'.repeat(decimals)}`

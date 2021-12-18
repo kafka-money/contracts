@@ -1,4 +1,5 @@
-const StakingRewardsLock = artifacts.require("StakingRewardsLock");
+const StakingRewardsKafka = artifacts.require("StakingRewardsKafka");
+const KafkaStaker = artifacts.require("KafkaStaker");
 const IERC20 = artifacts.require("ERC20");
 const PairFor = artifacts.require("PairFor");
 const fs = require('fs');
@@ -41,7 +42,7 @@ async function main() {
 
 
     const rewardPerSecond = web3.utils.toWei('0.1');
-    const reward60days = web3.utils.toWei("600000");
+    const reward90days = web3.utils.toWei("900000");
     for(const i in tokens) {
         const token0 = tokens[i];
         for(let j = Number(i)+1; j < tokens.length; j++) {
@@ -52,17 +53,19 @@ async function main() {
             //const pair2 = await pairC.pairFor(deployed.FACTORY_ADDRESS, token0.address, token1.address)
             //console.log(i, deployed.FACTORY_ADDRESS, token0, token1, pair)
             console.log(i, token0.symbol, token1.symbol, pair, await exist(pair));
-            const stake = await StakingRewardsLock.new(UNI, pair, uniPool.stakingAddress);
+            const stake = await StakingRewardsKafka.new(UNI, pair, uniPool.stakingAddress);
             stakes.push({
                 tokens: [token0.symbol, token1.symbol],
                 stakingRewardAddress: stake.address
             });
             console.log("transfer...")
-            await uni.transfer(stake.address, reward60days);
+            await uni.transfer(stake.address, reward90days);
             console.log("setRewardRate...")
             await stake.setRewardRate(rewardPerSecond);
         }
     }
+    const uniStaker = await KafkaStaker.at(uniPool.stakingAddress);
+    await uniStaker.addMinter(stakes.map(stake=>stake.stakingRewardAddress));
     console.log(stakes)
     deployed.STAKING_REWARDS_INFO = stakes;
     fs.writeFileSync(`./factory_${chainID}.json`, JSON.stringify(deployed));
