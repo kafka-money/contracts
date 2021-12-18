@@ -14,7 +14,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {IStakingRewards} from "./interfaces/IStakingRewards.sol";
 import {IUniswapV2ERC20} from "./interfaces/IUniswapV2ERC20.sol";
-import {MultiFeeDistribution} from "./KafkaStaker.sol";
+import {KafkaStaker} from "./KafkaStaker.sol";
 
 contract StakingRewardsKafka is IStakingRewards, ReentrancyGuard,Ownable {
     using SafeMath for uint256;
@@ -35,7 +35,7 @@ contract StakingRewardsKafka is IStakingRewards, ReentrancyGuard,Ownable {
 
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
-    MultiFeeDistribution kafkaStaker;
+    KafkaStaker kafkaStaker;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -46,7 +46,7 @@ contract StakingRewardsKafka is IStakingRewards, ReentrancyGuard,Ownable {
     ) public {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
-        kafkaStaker = MultiFeeDistribution(_kafkaStaker);
+        kafkaStaker = KafkaStaker(_kafkaStaker);
     }
 
     /* ========== VIEWS ========== */
