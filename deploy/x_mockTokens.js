@@ -50,15 +50,19 @@ const Tokens = [{
 async function faucet(tokens) {
     const chainId = await web3.eth.getChainId();
     const accounts = await web3.eth.getAccounts();
+    const deployed = require(`../factory_${chainId}.json`);
+    const uni = await ERC20Mock.at(deployed.UNI);
+    uni.info = {price: 2, decimals: 18}
+    const extTokens = [...tokens, uni]
     TestAddresses.push(accounts[0]);
     for (let tester of TestAddresses) {
-        D('mint faucet:', tester, tokens.length);
+        D('mint faucet:', tester, extTokens.length);
         if (chainId == 1337 || chainId == 31337)
             await web3.eth.sendTransaction({ from:accounts[0], to: tester, value: nDecimals(2, 18) });
-        for(let token of tokens) {
+        for(let token of extTokens) {
             const amount = nDecimals(1000000, token.info.decimals);
             console.log("mint:", token.info.symbol, amount.toString())
-            await token.mint(tester, amount);
+            token == uni ? await token.transfer(tester, amount) : await token.mint(tester, amount);
         }
     }
 }
@@ -95,8 +99,8 @@ async function addLp(tokens) {
     const router = await UniswapV2Router02.at(deployed.ROUTER_ADDRESS);
     const uni = await ERC20Mock.at(deployed.UNI);
     const weth = await WETH.at(deployed.WETH);
-    uni.info = {price: 2, decimals: 18}
-    weth.info = {price: 10, decimals: 18}
+    uni.info = {price: 2, decimals: 18, symbol: 'uni'}
+    weth.info = {price: 10, decimals: 18, symbol: 'weth'}
     const value = bn(100000);
     const extTokens = [...tokens, uni, weth]
     for(const i in extTokens) {
@@ -111,9 +115,8 @@ async function addLp(tokens) {
             if(token1 == weth) await weth.deposit({value:token1Amount})
             await token0.approve(router.address, token0Amount);
             await token1.approve(router.address, token1Amount);
-            console.log("addLiquidity-1")
+            console.log("addLiquidity:", token0.info.symbol, token1.info.symbol)
             await router.addLiquidity(token0.address, token1.address, token0Amount, token1Amount, 0, 0, accounts[0], uDecimals); 
-            console.log("addLiquidity-2")
             const pair = pairAddress(token0.address, token1.address);
             console.log(i, token0.info.symbol, token1.info.symbol, pair, await exist(pair));
         }

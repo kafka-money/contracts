@@ -42,7 +42,7 @@ async function main() {
 
 
     const rewardPerSecond = web3.utils.toWei('0.1');
-    const reward90days = web3.utils.toWei("900000");
+    const reward90days = web3.utils.toWei("60480");
     for(const i in tokens) {
         const token0 = tokens[i];
         for(let j = Number(i)+1; j < tokens.length; j++) {

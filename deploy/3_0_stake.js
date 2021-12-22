@@ -18,7 +18,7 @@ async function main() {
     const stakes = []
 
     const rewardPerSecond = web3.utils.toWei('0.1');
-    const reward90days = web3.utils.toWei("900000");
+    const reward90days = web3.utils.toWei("1");
     console.log("uni:", UNI)
     const staker = await KafkaStaker.new(UNI);
     await staker.approveRewardDistributor(UNI, accounts[0], true);
