@@ -3,8 +3,8 @@
 pragma solidity =0.6.6;
 
 contract WETH {
-  string public name = "Wrapped Ether";
-  string public symbol = "WETH";
+  string public name = "Wrapped Findora";
+  string public symbol = "WFRA";
   uint8 public decimals = 18;
 
   event Approval(address indexed src, address indexed guy, uint256 wad);

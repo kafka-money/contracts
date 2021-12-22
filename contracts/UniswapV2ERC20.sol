@@ -8,8 +8,8 @@ import {IUniswapV2ERC20} from "./interfaces/IUniswapV2ERC20.sol";
 contract UniswapV2ERC20 is IUniswapV2ERC20 {
     using SafeMath for uint;
 
-    string public constant override name = 'Uniswap V2';
-    string public constant override symbol = 'UNI-V2';
+    string public constant override name = 'KAFKA LP';
+    string public constant override symbol = 'KFKL';
     uint8 public constant override decimals = 18;
     uint  public override totalSupply;
     mapping(address => uint) public override balanceOf;

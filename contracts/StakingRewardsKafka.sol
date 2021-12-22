@@ -26,7 +26,7 @@ contract StakingRewardsKafka is IStakingRewards, ReentrancyGuard,Ownable {
     IERC20 public stakingToken;
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
-    uint256 public rewardsDuration = 60 days;
+    uint256 public rewardsDuration = 7 days;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
 
@@ -47,6 +47,7 @@ contract StakingRewardsKafka is IStakingRewards, ReentrancyGuard,Ownable {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         kafkaStaker = KafkaStaker(_kafkaStaker);
+        require(address(rewardsToken) == address(kafkaStaker.stakingToken()), "wrong kafkaStaker");
     }
 
     /* ========== VIEWS ========== */
@@ -143,7 +144,7 @@ contract StakingRewardsKafka is IStakingRewards, ReentrancyGuard,Ownable {
         lastUpdateTime = lastTimeRewardApplicable();
         if (account != address(0)) {
             uint256 deltaEarned = earned(account);
-            stakingToken.approve(address(kafkaStaker), deltaEarned);
+            rewardsToken.approve(address(kafkaStaker), deltaEarned);
             kafkaStaker.mint(account, deltaEarned);
             //rewards[account] = earned(account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
