@@ -1,0 +1,48 @@
+{
+    "testnet": {
+        "heco": {
+            "url": "https://http-testnet.hecochain.com",
+            "chainId": 256
+        },
+        "bsc": {
+            "url": "https://data-seed-prebsc-1-s3.binance.org:8545/",
+            "chainId": 97
+        },
+        "ok": {
+            "url": "https://exchaintestrpc.okex.org",
+            "chainId": 65
+        },
+        "hmy": {
+            "url": "https://api.s0.b.hmny.io",
+            "chainId": 1666700000
+        }
+    },
+    "mainnet": {
+        "heco": {
+            "url": "https://http-mainnet-node.huobichain.com",
+            "chainId": 128
+        },
+        "bsc": {
+            "url": "https://bsc-dataseed.binance.org",
+            "chainId": 56
+        },
+        "ok": {
+            "url": "https://exchainrpc.okex.org",
+            "chainId": 66
+        },
+        "hmy": {
+            "url": "https://api.s0.t.hmny.io",
+            "chainId": 1666600000
+        },
+        "polygon": {
+            "url": "https://polygon-rpc.com",
+            "chainId": 137,
+            "gasMultiplier": 1.5
+        },
+        "arbitrum": {
+            "url": "https://arb1.arbitrum.io/rpc",
+            "chainId": 42161,
+            "gasMultiplier": 1
+        }
+    }
+}
